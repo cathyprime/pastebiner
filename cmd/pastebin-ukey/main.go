@@ -10,9 +10,12 @@ import (
 	"github.com/Yoolayn/pastebiner/internal/consts"
 )
 
+const (
+	loginUrl           = "https://pastebin.com/api/api_login.php"
+)
+
 func main() {
 	consts.SetEnv()
-	loginUrl := os.Getenv("LOGINURL")
 	apiLogin := os.Getenv("APILOGIN")
 	apiDevKey := os.Getenv("APIDEVKEY")
 	apiPassword := os.Getenv("APIPASSWORD")
