@@ -1,6 +1,8 @@
 package main
 
 import (
+	"bufio"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -9,33 +11,29 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
 	"github.com/Yoolayn/pastebiner/internal/consts"
 )
 
-func main() {
-	consts.SetEnv()
-	apiUrl := os.Getenv("APIURL")
-	loginUrl := os.Getenv("LOGINURL")
-	apiLogin := os.Getenv("APILOGIN")
-	apiDevKey := os.Getenv("APIDEVKEY")
-	apiPassword := os.Getenv("APIPASSWORD")
-	apiPastePrivate := os.Getenv("APIPASTEPRIVATE")
-	apiPasteExpireDate := os.Getenv("APIPASTEEXPIREDATE")
+const (
+	apiUrl             = "https://pastebin.com/api/api_post.php"
+	loginUrl           = "https://pastebin.com/api/api_login.php"
+	apiPastePrivate    = "0"
+	apiPasteExpireDate = "N"
+)
 
-	if len(os.Args) != 2 {
-		fmt.Println("provide one file name")
-		return
-	}
-	filename := os.Args[1]
+var (
+	apiLogin       string
+	apiDevKey      string
+	apiUserKey     string
+	apiPassword    string
+	apiPasteName   string
+	apiPasteFormat string
+)
 
-	apiPasteFormat := strings.TrimPrefix(filepath.Ext(filename), ".")
-	apiPasteName := strings.TrimSuffix(filename, apiPasteFormat)
-	apiPasteName = strings.TrimSuffix(apiPasteName, ".")
-
-	bitties, err := os.ReadFile(filename)
-	if err != nil {
-		fmt.Println(err)
-		return
+func getLoginKey() (string, error) {
+	if loginUrl == "" || apiDevKey == "" || apiLogin == "" || apiPassword == "" {
+		return "", errors.New("variable not initialized")
 	}
 
 	loginRes, err := http.PostForm(loginUrl, url.Values{
@@ -44,19 +42,95 @@ func main() {
 		"api_user_password": {apiPassword},
 	})
 	if err != nil {
+		return "", err
+	}
+
+	login, err := io.ReadAll(loginRes.Body)
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
+
+	return string(login), nil
+}
+
+func main() {
+	consts.SetEnv()
+	apiLogin = os.Getenv("APILOGIN")
+	apiDevKey = os.Getenv("APIDEVKEY")
+	apiPassword = os.Getenv("APIPASSWORD")
+
+	var err error
+	apiUserKey, err = getLoginKey()
+	if err != nil {
 		fmt.Println(err)
 		return
 	}
 
-	apiUserKey := func() string {
-		login, err := io.ReadAll(loginRes.Body)
-		if err != nil {
-			fmt.Println(err)
-			os.Exit(1)
-		}
+	if len(os.Args) != 2 {
+		fmt.Println("provide one file name")
+		return
+	}
+	filename := os.Args[1]
+	filename, err = filepath.Abs(filename)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
 
-		return string(login)
-	}()
+	filename = filepath.Base(filename)
+	file := strings.Split(filename, ".")
+
+	if len(file) != 2 {
+		fmt.Println("wrong filename")
+		return
+	}
+
+	apiPasteName = file[0]
+	apiPasteFormat = file[1]
+
+	bitties, err := os.ReadFile(filename)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+
+	pastes, err := getPastes()
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+
+	for _, v := range pastes {
+		if v.Title == apiPasteName {
+			fmt.Println("paste of the name " + apiPasteName + " exists already, delete it? [yes/No]")
+			scanner := bufio.NewScanner(os.Stdin)
+			if ok := scanner.Scan(); ok {
+				text := scanner.Text()
+				text = strings.ToLower(text)
+				if text != "yes" && text != "y" {
+					continue
+				}
+
+				res, err := http.PostForm(apiUrl, url.Values{
+					"api_dev_key":   {apiDevKey},
+					"api_user_key":  {apiUserKey},
+					"api_paste_key": {v.Key},
+					"api_option":    {"delete"},
+				})
+				if err != nil {
+					fmt.Println("failed to delete")
+					return
+				} 
+				bitties, err := httputil.DumpResponse(res, true)
+				if err != nil {
+					fmt.Println("failed to decode response")
+					return
+				}
+				fmt.Println(string(bitties))
+			}
+		}
+	}
 
 	res, err := http.PostForm(apiUrl, url.Values{
 		"api_dev_key":           {apiDevKey},
