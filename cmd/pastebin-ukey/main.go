@@ -11,7 +11,7 @@ import (
 )
 
 const (
-	loginUrl           = "https://pastebin.com/api/api_login.php"
+	loginUrl = "https://pastebin.com/api/api_login.php"
 )
 
 func main() {
