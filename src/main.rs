@@ -56,6 +56,10 @@ fn get_public_paste(paste_code: &str) -> Result<blocking::Response, reqwest::Err
         .send()
 }
 
+// fn get_file(file_name: Path) {
+//     unimplemented!();
+// }
+
 fn cli() -> Command {
     Command::new("pastebin")
         .about("Tool to interact with pastebin.com from CLI")
@@ -66,9 +70,13 @@ fn cli() -> Command {
         .subcommand(
             Command::new("get")
                 .about("get the contents of a paste")
-                .arg(arg!(<CODE> "aaa").required(true)),
+                .arg(arg!(<CODE> "code of a paste to get").required(true)),
         )
-        .subcommand(Command::new("new").about("create a new paste"))
+        .subcommand(
+            Command::new("new")
+                .about("create a new paste")
+                .arg(arg!([FILE] "name of a file to upload"))
+        )
         .subcommand(Command::new("delete").about("delete an existing paste"))
 }
 
@@ -129,12 +137,12 @@ fn main() {
                 Err(e) => eprintln!("{}", e),
             }
         }
-        Some(("new", _)) => {
-            // TODO: pastebin new -> create new paste
-            todo!()
-        }
         Some(("delete", _)) => {
             // TODO: pastebin delete -> delete a paste
+            todo!()
+        }
+        Some(("new", _)) => {
+            // TODO: pastebin new -> create new paste
             todo!()
         }
         _ => unimplemented!(),
