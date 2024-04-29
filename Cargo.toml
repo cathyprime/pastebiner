@@ -6,9 +6,8 @@ edition = "2021"
 [dependencies]
 ansi_term = "0.12.1"
 chrono = "0.4.38"
-clap = { version = "4.5.4", features = ["derive"] }
+clap = "4.5.4"
 dotenv_codegen = "0.15.0"
-http = "1.1.0"
 reqwest = { version = "0.12.4", features = ["multipart", "blocking"] }
 serde = { version = "1.0.199", features = ["derive"] }
 serde-xml-rs = "0.6.0"

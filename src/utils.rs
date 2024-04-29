@@ -1,3 +1,23 @@
+pub(crate) mod styles {
+    use ansi_term::{Color, Style};
+
+    pub fn missing() -> Style {
+        Color::Red.bold()
+    }
+
+    pub fn date() -> Color {
+        Color::Green
+    }
+
+    pub fn privacy() -> Style {
+        Color::Yellow.underline()
+    }
+
+    pub fn key() -> Color {
+        Color::Purple
+    }
+}
+
 pub(crate) mod file_size {
     use serde::Deserialize;
     use std::fmt::Display;
@@ -148,6 +168,8 @@ pub(crate) mod string_to_datetime {
 }
 
 pub(crate) mod website {
+    use super::styles::missing;
+
     #[derive(serde::Deserialize, Debug)]
     pub(crate) struct Website {
         url: Option<url::Url>,
@@ -160,7 +182,7 @@ pub(crate) mod website {
                 "{}",
                 match &self.url {
                     Some(v) => v.to_string(),
-                    None => "<No website>".to_string(),
+                    None => missing().paint("<No website>").to_string(),
                 }
             )
         }

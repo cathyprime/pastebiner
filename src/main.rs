@@ -1,6 +1,8 @@
 mod parsers;
 mod utils;
 
+// TODO: make code work
+
 use crate::parsers::list;
 use crate::parsers::info;
 use clap::Command;
@@ -55,7 +57,6 @@ fn main() {
     let matches = cli().get_matches();
 
     match matches.subcommand() {
-        // Some(("info", _)) => todo!(),
         Some(("info", _)) => {
             match get_user_info(api_user_dev_key.to_string(), api_user_key.to_string()) {
                 Ok(v) => match serde_xml_rs::from_reader::<blocking::Response, info::Info>(v) {
@@ -76,20 +77,16 @@ fn main() {
         }
         Some(("get", _)) => {
             todo!()
+            // TODO: pastebin get -> get specific paste
         }
         Some(("new", _)) => {
             todo!()
+            // TODO: pastebin new -> create new paste
         }
         Some(("delete", _)) => {
             todo!()
+            // TODO: pastebin delete -> delete a paste
         }
         _ => unimplemented!(),
     };
 }
-
-// TODO: make code work
-
-// TODO: pastebin get -> get specific paste
-// TODO: pastebin new -> create new paste
-// TODO: pastebin delete -> delete a paste
-
