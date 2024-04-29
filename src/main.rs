@@ -8,52 +8,105 @@ use crate::parsers::list;
 use clap::{arg, Command};
 use dotenv_codegen::dotenv;
 use reqwest::blocking::{self, multipart};
+use std::result::Result;
 
 const API_URL: &str = "https://pastebin.com/api/api_post.php";
+
+enum Connection<T, E> {
+    Info(Result<T, E>),
+    List(Result<T, E>),
+    Get(Result<T, E>),
+    #[allow(dead_code)]
+    Delete(Result<T, E>),
+    #[allow(dead_code)]
+    New(Result<T, E>),
+}
+
+#[derive(Debug)]
+enum PastebinError {
+    ConnectionError(reqwest::Error),
+    EncodingError(serde_xml_rs::Error),
+}
+
+impl std::error::Error for PastebinError {}
+
+impl From<reqwest::Error> for PastebinError {
+    fn from(value: reqwest::Error) -> Self {
+        Self::ConnectionError(value)
+    }
+}
+
+impl From<serde_xml_rs::Error> for PastebinError {
+    fn from(value: serde_xml_rs::Error) -> Self {
+        Self::EncodingError(value)
+    }
+}
+
+impl std::fmt::Display for PastebinError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            PastebinError::ConnectionError(e) => {
+                write!(f, "Pastebin returned an error: {}", e)
+            }
+            PastebinError::EncodingError(e) => {
+                write!(f, "There was an error parsing results: {}", e)
+            }
+        }
+    }
+}
 
 fn get_user_info(
     api_user_dev_key: String,
     api_user_key: String,
-) -> Result<blocking::Response, reqwest::Error> {
+) -> Result<blocking::Response, PastebinError> {
     let form = multipart::Form::new()
         .text("api_dev_key", api_user_dev_key)
         .text("api_user_key", api_user_key)
         .text("api_option", "userdetails");
 
-    blocking::Client::new().post(API_URL).multipart(form).send()
+    Ok(blocking::Client::new()
+        .post(API_URL)
+        .multipart(form)
+        .send()?)
 }
 
 fn list_pastes(
     api_user_dev_key: String,
     api_user_key: String,
     api_results_limit: i16,
-) -> Result<blocking::Response, reqwest::Error> {
+) -> Result<blocking::Response, PastebinError> {
     let form = multipart::Form::new()
         .text("api_dev_key", api_user_dev_key)
         .text("api_user_key", api_user_key)
         .text("api_result_limit", api_results_limit.to_string())
         .text("api_option", "list");
 
-    blocking::Client::new().post(API_URL).multipart(form).send()
+    Ok(blocking::Client::new()
+        .post(API_URL)
+        .multipart(form)
+        .send()?)
 }
 
 fn get_paste(
     api_user_dev_key: String,
     api_user_key: String,
     paste_code: String,
-) -> Result<blocking::Response, reqwest::Error> {
+) -> Result<blocking::Response, PastebinError> {
     let form = multipart::Form::new()
         .text("api_dev_key", api_user_dev_key)
         .text("api_user_key", api_user_key)
         .text("api_paste_key", paste_code)
         .text("api_option", "show_paste");
-    blocking::Client::new().post(API_URL).multipart(form).send()
+    Ok(blocking::Client::new()
+        .post(API_URL)
+        .multipart(form)
+        .send()?)
 }
 
-fn get_public_paste(paste_code: &str) -> Result<blocking::Response, reqwest::Error> {
-    blocking::Client::new()
+fn get_public_paste(paste_code: &str) -> Result<blocking::Response, PastebinError> {
+    Ok(blocking::Client::new()
         .get("https://pastebin.com/raw/".to_string() + paste_code)
-        .send()
+        .send()?)
 }
 
 // fn get_file(file_name: Path) {
@@ -75,9 +128,24 @@ fn cli() -> Command {
         .subcommand(
             Command::new("new")
                 .about("create a new paste")
-                .arg(arg!([FILE] "name of a file to upload"))
+                .arg(arg!([FILE] "name of a file to upload")),
         )
         .subcommand(Command::new("delete").about("delete an existing paste"))
+}
+
+fn handle_result(
+    result: Connection<blocking::Response, PastebinError>,
+) -> Result<(), PastebinError> {
+    match result {
+        Connection::Info(v) => {
+            let info = serde_xml_rs::from_reader::<blocking::Response, info::Info>(v?)?
+        }
+        Connection::List(v) => todo!(),
+        Connection::Get(v) => todo!(),
+        Connection::Delete(v) => todo!(),
+        Connection::New(v) => todo!(),
+    };
+    Ok(())
 }
 
 fn main() {
@@ -86,55 +154,29 @@ fn main() {
 
     let matches = cli().get_matches();
 
-    match matches.subcommand() {
-        Some(("info", _)) => {
-            match get_user_info(api_user_dev_key.to_string(), api_user_key.to_string()) {
-                Ok(v) => match serde_xml_rs::from_reader::<blocking::Response, info::Info>(v) {
-                    Ok(v) => println!("{}", v),
-                    Err(e) => eprintln!("{}", e),
-                },
-                Err(e) => eprintln!("{}", e),
-            }
-        }
-        Some(("list", _)) => {
-            match list_pastes(api_user_dev_key.to_string(), api_user_key.to_string(), 50) {
-                Ok(v) => match serde_xml_rs::from_reader::<blocking::Response, Vec<list::Paste>>(v)
-                {
-                    Ok(v) => v.into_iter().for_each(|x| print!("{}", x)),
-                    Err(e) => eprintln!("{}", e),
-                },
-                Err(e) => eprintln!("{}", e),
-            }
-        }
+    let result = match matches.subcommand() {
+        Some(("info", _)) => Connection::Info(get_user_info(
+            api_user_dev_key.to_string(),
+            api_user_key.to_string(),
+        )),
+        Some(("list", _)) => Connection::List(list_pastes(
+            api_user_dev_key.to_string(),
+            api_user_key.to_string(),
+            50,
+        )),
         Some(("get", sub_matches)) => {
             let paste_code = match sub_matches.get_one::<String>("CODE") {
                 Some(v) => v.to_string(),
                 None => "".to_string(),
             };
-            match get_paste(
+            let paste_result = get_paste(
                 api_user_dev_key.to_string(),
                 api_user_key.to_string(),
                 paste_code.to_string(),
-            ) {
-                Ok(v) => {
-                    let text = match v.text() {
-                        Ok(v) => v,
-                        Err(e) => e.to_string(),
-                    };
-                    if text == "Bad API request, invalid permission to view this paste or invalid api_paste_key" {
-                        eprintln!("another user's paste detected, fetching...");
-                        match get_public_paste(&paste_code) {
-                            Ok(v) => match v.text() {
-                                Ok(v) => println!("{}", v),
-                                Err(e) => eprintln!("failed to get the text of response: {}", e),
-                            },
-                            Err(e) => eprintln!("paste not found: {}", e),
-                        }
-                    } else {
-                        println!("{}", text);
-                    }
-                }
-                Err(e) => eprintln!("{}", e),
+            );
+            match paste_result {
+                Ok(_) => Connection::Get(paste_result),
+                Err(_) => Connection::Get(get_public_paste(&paste_code)),
             }
         }
         Some(("delete", _)) => {
@@ -147,4 +189,8 @@ fn main() {
         }
         _ => unimplemented!(),
     };
+
+    if let Err(e) = handle_result(result) {
+        println!("{}", e);
+    }
 }
