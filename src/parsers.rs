@@ -1,8 +1,8 @@
 pub(crate) mod list {
-    use crate::utils::styles::{date, key, missing, privacy};
     use crate::utils::file_size::Size;
     use crate::utils::private::Privacy;
     use crate::utils::string_to_datetime::string_to_datetime;
+    use crate::utils::styles::{date, key, missing, privacy};
     use chrono::{DateTime, Utc};
     use serde::Deserialize;
     use std::fmt::Display;
@@ -56,8 +56,8 @@ pub(crate) mod list {
 }
 
 pub(crate) mod info {
-    use crate::utils::styles::{missing, privacy};
     use crate::utils::private::Privacy;
+    use crate::utils::styles::{missing, privacy};
     use crate::utils::website::Website;
     use ansi_term::{Color, Style};
     use serde::Deserialize;

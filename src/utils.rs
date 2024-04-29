@@ -161,7 +161,7 @@ pub(crate) mod string_to_datetime {
         D: serde::Deserializer<'de>,
     {
         let s = String::deserialize(deserializer)?;
-        let duration = Duration::from_secs(s.parse::<u64>().unwrap());
+        let duration = Duration::from_secs(s.parse::<u64>().map_err(serde::de::Error::custom)?);
         let datetime = DateTime::<Utc>::from(UNIX_EPOCH + duration);
         Ok(datetime)
     }
@@ -187,5 +187,4 @@ pub(crate) mod website {
             )
         }
     }
-
 }
