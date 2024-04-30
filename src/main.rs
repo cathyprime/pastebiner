@@ -284,8 +284,9 @@ fn match_command(
         Some(("delete", sub_matches)) => handle_delete(sub_matches, api_user_key, api_user_dev_key),
         Some(("new", sub_matches)) => handle_new(sub_matches, api_user_dev_key, api_user_key),
         _ => unimplemented!(),
-    };
-    Ok(println!("{}", result?))
+    }?;
+    println!("{}", result);
+    Ok(())
 }
 
 fn main() {

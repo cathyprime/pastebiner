@@ -29,27 +29,28 @@ pub(crate) mod list {
                 "" => &missing().paint("<No title>").to_string(),
                 _ => &self.paste_title,
             };
-            writeln!(
+            write!(
                 f,
-                "{}",
-                [
-                    format!("title:       {}", title),
-                    format!("key:         {}", key().paint(&self.paste_key)),
-                    format!("url:         {}", self.paste_url),
-                    format!("size:        {}", self.paste_size),
-                    format!(
-                        "privacy:     {}",
-                        privacy().paint(self.paste_private.to_string())
-                    ),
-                    format!("format:      {}", self.paste_format_long),
-                    format!("hits:        {}", self.paste_hits),
-                    format!("date:        {}", date().paint(self.paste_date.to_string())),
-                    format!(
-                        "expire date: {}",
-                        date().paint(self.paste_expire_date.to_string())
-                    ),
-                ]
-                .join("\n")
+                concat!(
+                    "title:       {}\n",
+                    "key:         {}\n",
+                    "url:         {}\n",
+                    "size:        {}\n",
+                    "privacy:     {}\n",
+                    "format:      {}\n",
+                    "hits:        {}\n",
+                    "date:        {}\n",
+                    "expire date: {}\n"
+                ),
+                title,
+                key().paint(&self.paste_key),
+                self.paste_url,
+                self.paste_size,
+                privacy().paint(self.paste_private.to_string()),
+                self.paste_format_long,
+                self.paste_hits,
+                date().paint(self.paste_date.to_string()),
+                date().paint(self.paste_expire_date.to_string())
             )
         }
     }
@@ -66,10 +67,6 @@ pub(crate) mod info {
     #[derive(Deserialize, Debug)]
     pub(crate) struct Info {
         user_name: String,
-        #[serde(rename(deserialize = "user_format_short"))]
-        _user_format_short: String,
-        #[serde(rename(deserialize = "user_expiration"))]
-        _user_expiration: String,
         user_private: Privacy,
         user_website: Website,
         user_email: String,
@@ -89,24 +86,22 @@ pub(crate) mod info {
                 1 => Color::Green.paint("pro").to_string(),
                 _ => missing().paint("<No account type>").to_string(),
             };
-            writeln!(
+            write!(
                 f,
-                "{}",
-                [
-                    format!(
-                        "username:     {}",
-                        Style::new().bold().paint(&self.user_name)
-                    ),
-                    format!("account type: {}", account_type),
-                    format!("email:        {}", underline.paint(&self.user_email)),
-                    format!("website link: {}", self.user_website),
-                    format!("location:     {}", location),
-                    format!(
-                        "privacy:      {}",
-                        privacy().paint(self.user_private.to_string())
-                    ),
-                ]
-                .join("\n")
+                concat!(
+                    "username:     {}\n",
+                    "account type: {}\n",
+                    "email:        {}\n",
+                    "website link: {}\n",
+                    "location:     {}\n",
+                    "privacy:      {}\n"
+                ),
+                Style::new().bold().paint(&self.user_name),
+                account_type,
+                underline.paint(&self.user_email),
+                self.user_website,
+                location,
+                privacy().paint(self.user_private.to_string())
             )
         }
     }
