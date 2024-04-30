@@ -5,22 +5,12 @@ mod utils;
 
 use crate::parsers::info;
 use crate::parsers::list;
-use clap::{arg, Command};
+use clap::{arg, ArgMatches, Command};
 use dotenv_codegen::dotenv;
 use reqwest::blocking::{self, multipart};
 use std::result::Result;
 
 const API_URL: &str = "https://pastebin.com/api/api_post.php";
-
-enum Connection<T, E> {
-    Info(Result<T, E>),
-    List(Result<T, E>),
-    Get(Result<T, E>),
-    #[allow(dead_code)]
-    Delete(Result<T, E>),
-    #[allow(dead_code)]
-    New(Result<T, E>),
-}
 
 #[derive(Debug)]
 enum PastebinError {
@@ -55,48 +45,7 @@ impl std::fmt::Display for PastebinError {
     }
 }
 
-fn get_user_info(
-    api_user_dev_key: String,
-    api_user_key: String,
-) -> Result<blocking::Response, PastebinError> {
-    let form = multipart::Form::new()
-        .text("api_dev_key", api_user_dev_key)
-        .text("api_user_key", api_user_key)
-        .text("api_option", "userdetails");
-
-    Ok(blocking::Client::new()
-        .post(API_URL)
-        .multipart(form)
-        .send()?)
-}
-
-fn list_pastes(
-    api_user_dev_key: String,
-    api_user_key: String,
-    api_results_limit: i16,
-) -> Result<blocking::Response, PastebinError> {
-    let form = multipart::Form::new()
-        .text("api_dev_key", api_user_dev_key)
-        .text("api_user_key", api_user_key)
-        .text("api_result_limit", api_results_limit.to_string())
-        .text("api_option", "list");
-
-    Ok(blocking::Client::new()
-        .post(API_URL)
-        .multipart(form)
-        .send()?)
-}
-
-fn get_paste(
-    api_user_dev_key: String,
-    api_user_key: String,
-    paste_code: String,
-) -> Result<blocking::Response, PastebinError> {
-    let form = multipart::Form::new()
-        .text("api_dev_key", api_user_dev_key)
-        .text("api_user_key", api_user_key)
-        .text("api_paste_key", paste_code)
-        .text("api_option", "show_paste");
+fn api(form: multipart::Form) -> Result<blocking::Response, PastebinError> {
     Ok(blocking::Client::new()
         .post(API_URL)
         .multipart(form)
@@ -105,7 +54,7 @@ fn get_paste(
 
 fn get_public_paste(paste_code: &str) -> Result<blocking::Response, PastebinError> {
     Ok(blocking::Client::new()
-        .get("https://pastebin.com/raw/".to_string() + paste_code)
+        .get(format!("https://pastebin.com/raw/{}", paste_code))
         .send()?)
 }
 
@@ -133,64 +82,68 @@ fn cli() -> Command {
         .subcommand(Command::new("delete").about("delete an existing paste"))
 }
 
-fn handle_result(
-    result: Connection<blocking::Response, PastebinError>,
+fn match_command(
+    matches: ArgMatches,
+    api_user_dev_key: String,
+    api_user_key: String,
 ) -> Result<(), PastebinError> {
-    match result {
-        Connection::Info(v) => {
-            let info = serde_xml_rs::from_reader::<blocking::Response, info::Info>(v?)?
+    match matches.subcommand() {
+        Some(("info", _)) => {
+            let v = api(multipart::Form::new()
+                .text("api_dev_key", api_user_dev_key)
+                .text("api_user_key", api_user_key)
+                .text("api_option", "userdetails"));
+            println!(
+                "{}",
+                serde_xml_rs::from_reader::<blocking::Response, info::Info>(v?)?
+            );
+            Ok(())
         }
-        Connection::List(v) => todo!(),
-        Connection::Get(v) => todo!(),
-        Connection::Delete(v) => todo!(),
-        Connection::New(v) => todo!(),
-    };
-    Ok(())
-}
-
-fn main() {
-    let api_user_key = dotenv!("APIUSERKEY");
-    let api_user_dev_key = dotenv!("APIUSERDEVKEY");
-
-    let matches = cli().get_matches();
-
-    let result = match matches.subcommand() {
-        Some(("info", _)) => Connection::Info(get_user_info(
-            api_user_dev_key.to_string(),
-            api_user_key.to_string(),
-        )),
-        Some(("list", _)) => Connection::List(list_pastes(
-            api_user_dev_key.to_string(),
-            api_user_key.to_string(),
-            50,
-        )),
+        Some(("list", _)) => {
+            let v = api(multipart::Form::new()
+                .text("api_dev_key", api_user_dev_key)
+                .text("api_user_key", api_user_key)
+                .text("api_result_limit", "50")
+                .text("api_option", "list"));
+            serde_xml_rs::from_reader::<blocking::Response, Vec<list::Paste>>(v?)?
+                .into_iter()
+                .for_each(|p| println!("{}", p));
+            Ok(())
+        }
         Some(("get", sub_matches)) => {
             let paste_code = match sub_matches.get_one::<String>("CODE") {
                 Some(v) => v.to_string(),
                 None => "".to_string(),
             };
-            let paste_result = get_paste(
-                api_user_dev_key.to_string(),
-                api_user_key.to_string(),
-                paste_code.to_string(),
-            );
-            match paste_result {
-                Ok(_) => Connection::Get(paste_result),
-                Err(_) => Connection::Get(get_public_paste(&paste_code)),
+            let v = api(multipart::Form::new()
+                .text("api_dev_key", api_user_dev_key)
+                .text("api_user_key", api_user_key)
+                .text("api_paste_key", paste_code.clone())
+                .text("api_option", "show_paste"));
+            if v.is_err() {
+                println!("{}", get_public_paste(&paste_code)?.text()?);
+            } else {
+                println!("{}", v?.text()?);
             }
+            Ok(())
         }
         Some(("delete", _)) => {
-            // TODO: pastebin delete -> delete a paste
-            todo!()
+            todo!("pastebin delete -> delete a paste")
         }
         Some(("new", _)) => {
-            // TODO: pastebin new -> create new paste
-            todo!()
+            todo!("pastebin new -> create new paste")
         }
         _ => unimplemented!(),
-    };
+    }
+}
 
-    if let Err(e) = handle_result(result) {
+fn main() {
+    let api_user_key = dotenv!("APIUSERKEY").to_string();
+    let api_user_dev_key = dotenv!("APIUSERDEVKEY").to_string();
+
+    let matches = cli().get_matches();
+
+    if let Err(e) = match_command(matches, api_user_dev_key, api_user_key) {
         println!("{}", e);
     }
 }
