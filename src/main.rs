@@ -5,13 +5,14 @@ mod utils;
 
 use crate::parsers::info;
 use crate::parsers::list;
-use clap::{arg, builder, ArgMatches, Command};
+use clap::{arg, ArgMatches, Command};
 use dotenv_codegen::dotenv;
 use reqwest::blocking::{self, multipart};
 use std::fs;
 use std::io::{self, BufRead};
 use std::path::Path;
 use std::result::Result;
+use utils::private::Privacy;
 
 const API_URL: &str = "https://pastebin.com/api/api_post.php";
 
@@ -21,6 +22,7 @@ enum PastebinError {
     Encoding(serde_xml_rs::Error),
     File(String),
     Io(io::Error),
+    Arg(String, String),
 }
 
 impl std::error::Error for PastebinError {}
@@ -58,6 +60,9 @@ impl std::fmt::Display for PastebinError {
             PastebinError::Io(io) => {
                 write!(f, "Io error: {}", io)
             }
+            PastebinError::Arg(argument, content) => {
+                write!(f, "Argument `{}` error: {}", argument, content)
+            }
         }
     }
 }
@@ -91,10 +96,40 @@ fn cli() -> Command {
                 .about("get the contents of a paste")
                 .arg(arg!(<CODE> "code of a paste to get")),
         )
-        .subcommand(Command::new("new").about("create a new paste").args(&[
-            arg!([FILE] "name of a file to upload"),
-            arg!(-g --guest "upload as a guest").action(clap::ArgAction::SetTrue),
-        ]))
+        .subcommand(
+            Command::new("new").about("create a new paste").args(&[
+                arg!([FILE] "name of a file to upload"),
+                arg!(-g --guest "upload as a guest").action(clap::ArgAction::SetTrue),
+                arg!(-t --title <TITLE> "set the title of the paste"),
+                arg!(-s --syntax <SYNTAX> "set the syntax of the paste"),
+                arg!(-e --expire <EXPIRE> "set expiration time")
+                    .long_help(
+                        [
+                            "possible values:",
+                            "N -> Never expire",
+                            "10M -> 10 minutes",
+                            "1H -> 1 hour",
+                            "1D -> 1 day",
+                            "1W -> 1 week",
+                            "2W -> 2 weeks",
+                            "1M -> 1 month",
+                            "6M -> 6 months",
+                            "1Y -> 1 year",
+                        ]
+                        .join("\n"),
+                    )
+                    .value_parser(["N", "10M", "1H", "1D", "1W", "2W", "1M", "6M", "1Y"])
+                    .default_value("N"),
+                arg!(-p --privacy <LEVEL> "set the level of privacy").long_help(
+                    [
+                        "`0` or `public` => will be Public",
+                        "`1` or `unlisted` => will be Unlisted",
+                        "`2` or `private` => will be Private",
+                    ]
+                    .join("\n"),
+                ),
+            ]),
+        )
         .subcommand(Command::new("delete").about("delete an existing paste"))
 }
 
@@ -186,9 +221,28 @@ fn match_command(
                 form = form.text("api_user_key", api_user_key);
             }
 
-            // println!("{:?}", form);
+            if let Some(expire) = sub_matches.get_one::<String>("expire") {
+                form = form.text("api_paste_expire_date", expire.to_string());
+            }
+
+            if let Some(title) = sub_matches.get_one::<String>("title") {
+                form = form.text("api_paste_name", title.to_string());
+            }
+
+            if let Some(level) = sub_matches.get_one::<String>("privacy") {
+                match Privacy::try_from(level.to_string()) {
+                    Ok(l) => form = form.text("api_paste_private", l.form_ready()),
+                    Err(e) => Err(PastebinError::Arg("privacy".to_string(), e))?,
+                };
+            }
+
+            if let Some(syntax) = sub_matches.get_one::<String>("syntax") {
+                form = form.text("api_paste_format", syntax.to_string());
+            }
+
             let v = api(form);
             println!("{}", v?.text()?);
+
             Ok(())
         }
         _ => unimplemented!(),

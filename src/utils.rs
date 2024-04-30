@@ -106,7 +106,7 @@ pub(crate) mod private {
     use serde::Deserialize;
     use std::fmt::Display;
 
-    #[derive(Debug)]
+    #[derive(Debug, Clone)]
     pub(crate) enum Privacy {
         Public,
         Unlisted,
@@ -128,10 +128,20 @@ pub(crate) mod private {
 
         fn try_from(value: String) -> Result<Self, Self::Error> {
             match value.as_str() {
-                "0" => Ok(Self::Public),
-                "1" => Ok(Self::Unlisted),
-                "2" => Ok(Self::Private),
+                "0" | "public" => Ok(Self::Public),
+                "1" | "unlisted" => Ok(Self::Unlisted),
+                "2" | "private" => Ok(Self::Private),
                 _ => Err("value out of range".to_string()),
+            }
+        }
+    }
+
+    impl Privacy {
+        pub(crate) fn form_ready(&self) -> String {
+            match self {
+                Privacy::Public   => "0".to_string(),
+                Privacy::Unlisted => "1".to_string(),
+                Privacy::Private  => "2".to_string(),
             }
         }
     }
