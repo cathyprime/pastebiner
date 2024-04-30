@@ -120,10 +120,11 @@ fn match_command(
                 .text("api_user_key", api_user_key)
                 .text("api_paste_key", paste_code.clone())
                 .text("api_option", "show_paste"));
-            if v.is_err() {
+            let text = v?.text()?;
+            if &text == "Bad API request, invalid permission to view this paste or invalid api_paste_key" {
                 println!("{}", get_public_paste(&paste_code)?.text()?);
             } else {
-                println!("{}", v?.text()?);
+                println!("{}", text);
             }
             Ok(())
         }
