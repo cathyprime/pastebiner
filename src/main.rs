@@ -17,7 +17,7 @@ const API_URL: &str = "https://pastebin.com/api/api_post.php";
 #[derive(Debug)]
 enum PastebinError {
     Connection(reqwest::Error),
-    Encoding(serde_xml_rs::Error),
+    Encoding,
     File(String),
     Io(io::Error),
     Arg(String, String),
@@ -32,8 +32,8 @@ impl From<reqwest::Error> for PastebinError {
 }
 
 impl From<serde_xml_rs::Error> for PastebinError {
-    fn from(value: serde_xml_rs::Error) -> Self {
-        Self::Encoding(value)
+    fn from(_value: serde_xml_rs::Error) -> Self {
+        Self::Encoding
     }
 }
 
@@ -49,8 +49,8 @@ impl std::fmt::Display for PastebinError {
             PastebinError::Connection(e) => {
                 write!(f, "Pastebin returned an error: {}", e)
             }
-            PastebinError::Encoding(e) => {
-                write!(f, "There was an error parsing results: {}", e)
+            PastebinError::Encoding => {
+                write!(f, "Empty response from server")
             }
             PastebinError::File(file) => {
                 write!(f, "File `{}` wasn't found", file)
