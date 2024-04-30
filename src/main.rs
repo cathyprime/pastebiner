@@ -1,8 +1,6 @@
 mod parsers;
 mod utils;
 
-// TODO: make code work
-
 use crate::parsers::info;
 use crate::parsers::list;
 use clap::{arg, ArgMatches, Command};
@@ -130,7 +128,11 @@ fn cli() -> Command {
                 ),
             ]),
         )
-        .subcommand(Command::new("delete").about("delete an existing paste"))
+        .subcommand(
+            Command::new("delete")
+                .about("delete an existing paste")
+                .arg(arg!(<CODE> "code of a paste to delete")),
+        )
 }
 
 fn match_command(
@@ -181,8 +183,19 @@ fn match_command(
             }
             Ok(())
         }
-        Some(("delete", _)) => {
-            todo!("pastebin delete -> delete a paste")
+        Some(("delete", sub_matches)) => {
+            let code = match sub_matches.get_one::<String>("CODE") {
+                Some(v) => v.to_string(),
+                None => Err(PastebinError::Arg("code".to_string(), "error getting the code".to_string()))?,
+            };
+            let v = api(multipart::Form::new()
+                .text("api_dev_key", api_user_dev_key)
+                .text("api_user_key", api_user_key)
+                .text("api_option", "delete")
+                .text("api_paste_key", code.to_string())
+            );
+            println!("{}", v?.text()?);
+            Ok(())
         }
         Some(("new", sub_matches)) => {
             let file = match sub_matches.get_one::<String>("FILE") {
