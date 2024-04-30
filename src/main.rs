@@ -5,7 +5,7 @@ mod utils;
 
 use crate::parsers::info;
 use crate::parsers::list;
-use clap::{arg, ArgMatches, Command};
+use clap::{arg, builder, ArgMatches, Command};
 use dotenv_codegen::dotenv;
 use reqwest::blocking::{self, multipart};
 use std::fs;
@@ -79,6 +79,10 @@ fn cli() -> Command {
     Command::new("pastebin")
         .about("Tool to interact with pastebin.com from CLI")
         .subcommand_required(true)
+        .args(&[
+            arg!(-u --apiuserkey <USERKEY> "provide a different api_user_key"),
+            arg!(-d --apidevkey <DEVKEY> "provide a different api_dev_key"),
+        ])
         .arg_required_else_help(true)
         .subcommand(Command::new("info").about("get user account information"))
         .subcommand(Command::new("list").about("get all the pastes made by the user"))
@@ -87,11 +91,10 @@ fn cli() -> Command {
                 .about("get the contents of a paste")
                 .arg(arg!(<CODE> "code of a paste to get")),
         )
-        .subcommand(
-            Command::new("new")
-                .about("create a new paste")
-                .arg(arg!([FILE] "name of a file to upload")),
-        )
+        .subcommand(Command::new("new").about("create a new paste").args(&[
+            arg!([FILE] "name of a file to upload"),
+            arg!(-g --guest "upload as a guest").action(clap::ArgAction::SetTrue),
+        ]))
         .subcommand(Command::new("delete").about("delete an existing paste"))
 }
 
@@ -174,11 +177,17 @@ fn match_command(
                     }
                 }
             };
-            let v = api(multipart::Form::new()
+            let mut form = multipart::Form::new()
                 .text("api_dev_key", api_user_dev_key)
                 .text("api_option", "paste")
-                .text("api_paste_code", file));
+                .text("api_paste_code", file);
 
+            if !sub_matches.get_flag("guest") {
+                form = form.text("api_user_key", api_user_key);
+            }
+
+            // println!("{:?}", form);
+            let v = api(form);
             println!("{}", v?.text()?);
             Ok(())
         }
