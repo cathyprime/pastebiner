@@ -61,6 +61,12 @@ pub(crate) mod file_size {
         Mega,
         Giga,
         Tera,
+        Peta,
+        Exa,
+        Zetta,
+        Yotta,
+        Ronna,
+        Quetta,
     }
 
     impl<'de> Deserialize<'de> for Size {
@@ -80,7 +86,13 @@ pub(crate) mod file_size {
                 Suffix::Kilo => Suffix::Mega,
                 Suffix::Mega => Suffix::Giga,
                 Suffix::Giga => Suffix::Tera,
-                Suffix::Tera => unimplemented!(),
+                Suffix::Tera => Suffix::Peta,
+                Suffix::Peta => Suffix::Exa,
+                Suffix::Exa => Suffix::Zetta,
+                Suffix::Zetta => Suffix::Yotta,
+                Suffix::Yotta => Suffix::Ronna,
+                Suffix::Ronna => Suffix::Quetta,
+                Suffix::Quetta => unimplemented!(),
             }
         }
     }
@@ -96,6 +108,12 @@ pub(crate) mod file_size {
                     Suffix::Mega => "MB",
                     Suffix::Giga => "GB",
                     Suffix::Tera => "TB",
+                    Suffix::Peta => "PB",
+                    Suffix::Exa => "EB",
+                    Suffix::Zetta => "ZB",
+                    Suffix::Yotta => "YB",
+                    Suffix::Ronna => "RB",
+                    Suffix::Quetta => "QB",
                 }
             )
         }
@@ -139,9 +157,9 @@ pub(crate) mod private {
     impl Privacy {
         pub(crate) fn form_ready(&self) -> String {
             match self {
-                Privacy::Public   => "0".to_string(),
+                Privacy::Public => "0".to_string(),
                 Privacy::Unlisted => "1".to_string(),
-                Privacy::Private  => "2".to_string(),
+                Privacy::Private => "2".to_string(),
             }
         }
     }
