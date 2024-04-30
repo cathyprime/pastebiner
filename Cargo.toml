@@ -5,6 +5,7 @@ edition = "2021"
 
 [dependencies]
 ansi_term = "0.12.1"
+atty = "0.2.14"
 chrono = "0.4.38"
 clap = "4.5.4"
 dotenv_codegen = "0.15.0"

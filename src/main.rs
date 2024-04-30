@@ -8,38 +8,55 @@ use crate::parsers::list;
 use clap::{arg, ArgMatches, Command};
 use dotenv_codegen::dotenv;
 use reqwest::blocking::{self, multipart};
+use std::fs;
+use std::io::{self, BufRead};
+use std::path::Path;
 use std::result::Result;
 
 const API_URL: &str = "https://pastebin.com/api/api_post.php";
 
 #[derive(Debug)]
 enum PastebinError {
-    ConnectionError(reqwest::Error),
-    EncodingError(serde_xml_rs::Error),
+    Connection(reqwest::Error),
+    Encoding(serde_xml_rs::Error),
+    File(String),
+    Io(io::Error),
 }
 
 impl std::error::Error for PastebinError {}
 
 impl From<reqwest::Error> for PastebinError {
     fn from(value: reqwest::Error) -> Self {
-        Self::ConnectionError(value)
+        Self::Connection(value)
     }
 }
 
 impl From<serde_xml_rs::Error> for PastebinError {
     fn from(value: serde_xml_rs::Error) -> Self {
-        Self::EncodingError(value)
+        Self::Encoding(value)
+    }
+}
+
+impl From<io::Error> for PastebinError {
+    fn from(value: io::Error) -> Self {
+        Self::Io(value)
     }
 }
 
 impl std::fmt::Display for PastebinError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            PastebinError::ConnectionError(e) => {
+            PastebinError::Connection(e) => {
                 write!(f, "Pastebin returned an error: {}", e)
             }
-            PastebinError::EncodingError(e) => {
+            PastebinError::Encoding(e) => {
                 write!(f, "There was an error parsing results: {}", e)
+            }
+            PastebinError::File(file) => {
+                write!(f, "File `{}` wasn't found", file)
+            }
+            PastebinError::Io(io) => {
+                write!(f, "Io error: {}", io)
             }
         }
     }
@@ -58,10 +75,6 @@ fn get_public_paste(paste_code: &str) -> Result<blocking::Response, PastebinErro
         .send()?)
 }
 
-// fn get_file(file_name: Path) {
-//     unimplemented!();
-// }
-
 fn cli() -> Command {
     Command::new("pastebin")
         .about("Tool to interact with pastebin.com from CLI")
@@ -72,7 +85,7 @@ fn cli() -> Command {
         .subcommand(
             Command::new("get")
                 .about("get the contents of a paste")
-                .arg(arg!(<CODE> "code of a paste to get").required(true)),
+                .arg(arg!(<CODE> "code of a paste to get")),
         )
         .subcommand(
             Command::new("new")
@@ -121,7 +134,9 @@ fn match_command(
                 .text("api_paste_key", paste_code.clone())
                 .text("api_option", "show_paste"));
             let text = v?.text()?;
-            if &text == "Bad API request, invalid permission to view this paste or invalid api_paste_key" {
+            if &text
+                == "Bad API request, invalid permission to view this paste or invalid api_paste_key"
+            {
                 println!("{}", get_public_paste(&paste_code)?.text()?);
             } else {
                 println!("{}", text);
@@ -131,8 +146,41 @@ fn match_command(
         Some(("delete", _)) => {
             todo!("pastebin delete -> delete a paste")
         }
-        Some(("new", _)) => {
-            todo!("pastebin new -> create new paste")
+        Some(("new", sub_matches)) => {
+            let file = match sub_matches.get_one::<String>("FILE") {
+                Some(user_input) => {
+                    let path = Path::new(user_input);
+                    match path.to_str() {
+                        None => Err(PastebinError::File(user_input.to_string()))?,
+                        Some(p) => {
+                            if path.is_file() {
+                                fs::read_to_string(p)?.to_string()
+                            } else {
+                                Err(PastebinError::File(p.to_string()))?
+                            }
+                        }
+                    }
+                }
+                None => {
+                    if atty::isnt(atty::Stream::Stdin) {
+                        io::stdin()
+                            .lock()
+                            .lines()
+                            .map(|l| l.expect("Couldn't read from stdin"))
+                            .collect::<Vec<String>>()
+                            .join("\n")
+                    } else {
+                        Err(PastebinError::File("".to_string()))?
+                    }
+                }
+            };
+            let v = api(multipart::Form::new()
+                .text("api_dev_key", api_user_dev_key)
+                .text("api_option", "paste")
+                .text("api_paste_code", file));
+
+            println!("{}", v?.text()?);
+            Ok(())
         }
         _ => unimplemented!(),
     }
@@ -145,6 +193,6 @@ fn main() {
     let matches = cli().get_matches();
 
     if let Err(e) = match_command(matches, api_user_dev_key, api_user_key) {
-        println!("{}", e);
+        eprintln!("{}", e);
     }
 }
