@@ -59,7 +59,7 @@ impl std::fmt::Display for PastebinError {
                 write!(f, "Io error: {}", io)
             }
             PastebinError::Arg(argument, content) => {
-                write!(f, "Argument `{}` error: {}", argument, content)
+                write!(f, "Argument `{}` failed with: {}", argument, content)
             }
         }
     }
@@ -224,7 +224,10 @@ fn get_file(sub_matches: &ArgMatches) -> Result<String, PastebinError> {
                     .collect::<Vec<String>>()
                     .join("\n")
             } else {
-                Err(PastebinError::File("".to_string()))?
+                Err(PastebinError::Arg(
+                    "new".to_string(),
+                    "requires either name as argument or file on stdin".to_string(),
+                ))?
             }
         }
     };

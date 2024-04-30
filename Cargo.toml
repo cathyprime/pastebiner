@@ -13,3 +13,7 @@ reqwest = { version = "0.12.4", features = ["multipart", "blocking"] }
 serde = { version = "1.0.199", features = ["derive"] }
 serde-xml-rs = "0.6.0"
 url = { version = "2.5.0", features = ["serde"] }
+
+[[bin]]
+name = "pastebin"
+path = "src/main.rs"
